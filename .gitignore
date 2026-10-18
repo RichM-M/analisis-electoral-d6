@@ -1,0 +1,11 @@
+__pycache__/
+pylib*/
+prep_2024_nuevo/
+bgd_cdmx/
+dashboard_test/
+.claude/
+*.zip
+*.7z
+*.kmz
+*.kml
+*.tar.gz

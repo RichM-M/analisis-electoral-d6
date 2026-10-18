@@ -1,0 +1,714 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Distrito 6">
+  <meta name="theme-color" content="#4a0910">
+  <meta name="color-scheme" content="dark">
+  <title>Distrito 6 · Tablero de estrategia electoral</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="xm.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <style>
+    html { background: var(--gris-1); }
+    body {
+      -webkit-text-size-adjust: 100%;
+      padding-top: env(safe-area-inset-top);
+      padding-bottom: env(safe-area-inset-bottom);
+      padding-left: env(safe-area-inset-left);
+      padding-right: env(safe-area-inset-right);
+      min-height: 100dvh;
+    }
+    .scroll-ios {
+      -webkit-overflow-scrolling: touch;
+      overscroll-behavior: contain;
+      scroll-behavior: smooth;
+    }
+    .num { font-variant-numeric: tabular-nums; }
+    .relative { position: relative; }
+    .gris { color: var(--gris-4); }
+
+    /* Pestañas móviles: marcador activo con subrayado de acento (Nav README) */
+    .tabs-moviles {
+      position: sticky; top: 0; z-index: 20;
+      display: flex; gap: var(--space-4);
+      padding: 0 var(--space-3);
+      background: var(--gris-1); border-bottom: 1px solid var(--gris-3);
+    }
+    .tab {
+      background: none; border: 0; border-bottom: 2px solid transparent;
+      padding: var(--space-2) 0; font: inherit; font-size: 16px; line-height: 24px;
+      color: var(--gris-4); cursor: pointer; transition: all 0.2s ease;
+    }
+    .tab:hover { color: var(--gris-5); }
+    .tab--activa { color: var(--gris-5); border-bottom-color: var(--acento); }
+
+    /* Filtros: dos columnas; el margen de campo lo da el grid */
+    .filtros { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3); }
+    .filtros .xm-field + .xm-field { margin-top: 0; }
+    .filtros .xm-field--ancho { grid-column: 1 / -1; }
+
+    /* Bloques: separados por divisor, sin cajas dentro de cajas */
+    .bloque {
+      display: flex; flex-direction: column; gap: var(--space-3);
+      border-top: 1px solid var(--gris-3); padding-top: var(--space-4);
+    }
+    .bloque > h2 { margin: 0; }
+
+    /* Dato protagonista + métricas secundarias */
+    .metricas { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: var(--space-3); }
+    .metrica { display: flex; flex-direction: column; gap: var(--space-1); }
+    .metrica .xm-subtitulo { margin: 0; }
+
+    /* Barras finas de progreso */
+    .barra { height: 4px; background: var(--gris-3); border-radius: 2px; overflow: hidden; margin-top: var(--space-2); }
+    .barra__fill { height: 100%; background: var(--gris-5); transition: width 0.4s var(--ease-out); }
+    .barra--suave .barra__fill { background: var(--gris-4); }
+    .fila-meta { display: flex; justify-content: space-between; gap: var(--space-2); font-size: 14px; line-height: 20px; color: var(--gris-4); }
+    .fila-meta span:last-child { color: var(--gris-5); }
+
+    /* Lista de secciones: scroll horizontal en móvil para no comprimir las colonias */
+    .tabla-wrap { overflow-x: auto; }
+    .tabla { width: 100%; border-collapse: collapse; font-size: 16px; line-height: 24px; }
+    .tabla td:nth-child(2) { white-space: normal; min-width: 120px; }
+    .tabla th {
+      position: sticky; top: 0; background: var(--gris-1);
+      color: var(--gris-4); font-size: 14px; line-height: 20px; font-weight: 400;
+      text-align: left; padding: var(--space-2) var(--space-2); border-bottom: 1px solid var(--gris-3);
+    }
+    .tabla td { padding: var(--space-2); border-bottom: 1px solid var(--gris-3); white-space: nowrap; }
+    .tabla tr:last-child td { border-bottom: 0; }
+    .tabla tbody tr { transition: background 0.2s ease; }
+    .tabla tbody tr:hover { background: rgba(255, 255, 255, 0.04); }
+    .tabla .der { text-align: right; }
+    .swatch { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: var(--space-2); vertical-align: middle; }
+    .tabla-pie { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); }
+
+    /* Enlace secundario: gris-5 con subrayado (no acento) */
+    .enlace { font-size: 14px; color: var(--gris-5); text-decoration: underline; text-underline-offset: 2px; }
+
+    /* Layout */
+    .pagina { display: flex; flex-direction: column; min-height: calc(100dvh - 64px); }
+    .panel-datos { display: flex; flex-direction: column; gap: var(--space-4); padding: var(--space-3); }
+    .panel-mapa { display: flex; flex-direction: column; gap: var(--space-3); padding: var(--space-3); }
+    .mapa-contenedor {
+      flex: 1; min-height: 60dvh; overflow: hidden;
+      border: 1px solid var(--gris-3); border-radius: var(--radius-md); background: var(--gris-2);
+    }
+    .mapa-frame { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+    .mapa-aviso {
+      position: absolute; inset: 0;
+      display: flex; align-items: center; justify-content: center;
+      padding: var(--space-4); text-align: center;
+    }
+
+    @media (max-width: 1023px) {
+      .tabla { min-width: 600px; }
+    }
+
+    @media (min-width: 1024px) {
+      .tabs-moviles { display: none; }
+      .pagina { flex-direction: row; }
+      .panel-datos {
+        width: 40%; height: calc(100dvh - 64px - 1px);
+        overflow-y: auto; border-right: 1px solid var(--gris-3);
+        padding: var(--space-4);
+      }
+      .panel-mapa { width: 60%; height: calc(100dvh - 64px - 1px); padding: var(--space-4); }
+      .panel-mapa.hidden { display: flex; }
+    }
+
+    /* Perfil de votantes: barra 100% apilada por género */
+    .gen-barra {
+      display: flex; height: 12px; border-radius: 9999px;
+      background: var(--gris-2); border: 1px solid var(--gris-3);
+    }
+    .gen-barra__seg { height: 100%; width: 0%; transition: width 0.5s var(--ease-out); }
+    .gen-barra__seg:first-child { border-radius: 9999px 0 0 9999px; }
+    .gen-barra__seg:last-child { border-radius: 0 9999px 9999px 0; }
+    .gen-barra__seg--m { background: var(--acento); }
+    .gen-barra__seg--h { background: var(--gris-4); }
+    .badges { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+    .badge {
+      display: inline-flex; align-items: center; gap: var(--space-2);
+      padding: var(--space-1) var(--space-3); border-radius: 9999px;
+      border: 1px solid var(--gris-3); font-size: 14px; line-height: 20px; color: var(--gris-5);
+      font-variant-numeric: tabular-nums;
+    }
+    .badge__punto { width: 8px; height: 8px; border-radius: 9999px; flex: none; }
+
+    /* Grupos de edad: riel de contraste sutil y relleno con el acento */
+    .riel {
+      height: 8px; border-radius: 9999px; margin-top: var(--space-2);
+      background: var(--gris-2); border: 1px solid var(--gris-3);
+    }
+    .riel__fill { height: 100%; width: 0%; border-radius: 9999px; background: var(--acento); transition: width 0.5s var(--ease-out); }
+
+    /* Tooltips del perfil de votantes: aparecen al pasar el cursor o al enfocar */
+    [data-tip] { position: relative; }
+    [data-tip]::after {
+      content: attr(data-tip);
+      position: absolute; left: 0; bottom: calc(100% + 8px); z-index: 30;
+      white-space: nowrap; padding: var(--space-2) var(--space-3);
+      background: var(--gris-2); border: 1px solid var(--gris-3); border-radius: var(--radius-md);
+      color: var(--gris-5); font-size: 14px; line-height: 20px; font-variant-numeric: tabular-nums;
+      opacity: 0; transform: translateY(4px); pointer-events: none;
+      transition: opacity 0.15s ease, transform 0.15s ease;
+    }
+    [data-tip]:hover::after,
+    [data-tip]:focus::after { opacity: 1; transform: translateY(0); }
+    [data-tip]:focus { outline: none; }
+    .fila-edad {
+      display: flex; justify-content: space-between; align-items: baseline; gap: var(--space-2);
+      font-size: 14px; line-height: 20px; color: var(--gris-4);
+    }
+    .fila-edad__valor { color: var(--gris-5); font-variant-numeric: tabular-nums; text-align: right; }
+
+    @media (prefers-reduced-motion: reduce) {
+      .gen-barra__seg, .riel__fill { transition: none; }
+    }
+
+    /* Barras de desplazamiento con la paleta de xm.css (Firefox y WebKit/Safari) */
+    * { scrollbar-width: thin; scrollbar-color: var(--gris-3) var(--gris-2); }
+    ::-webkit-scrollbar { width: 10px; height: 10px; }
+    ::-webkit-scrollbar-track { background: var(--gris-2); }
+    ::-webkit-scrollbar-thumb { background: var(--gris-3); border-radius: 9999px; border: 2px solid var(--gris-2); }
+    ::-webkit-scrollbar-thumb:hover { background: var(--gris-4); }
+    ::-webkit-scrollbar-corner { background: var(--gris-2); }
+
+    /* Gráfica de partidos: canvas a la izquierda y columna de votos a la derecha */
+    .grafica-fila { display: flex; align-items: stretch; gap: var(--space-2); }
+    .grafica-canvas { flex: 1; min-width: 0; }
+    .grafica-valores-col { width: 96px; flex: none; position: relative; }
+    .grafica-valores { position: absolute; inset: 0; }
+    .grafica-valores span {
+      position: absolute; right: 0; height: 20px; line-height: 20px;
+      font-size: 14px; color: var(--gris-5); font-variant-numeric: tabular-nums; white-space: nowrap;
+    }
+
+    /* Debe ir al final: gana sobre display de .panel-datos y .mapa-aviso */
+    .hidden { display: none; }
+  </style>
+</head>
+<body>
+
+  <header class="xm-nav">
+    <div>
+      <h1 class="xm-subtitulo">DISTRITO 6 FEDERAL · TABLERO DE ESTRATEGIA ELECTORAL</h1>
+      <p class="xm-etiqueta">Álvaro Obregón y La Magdalena Contreras · 2015–2024</p>
+    </div>
+  </header>
+
+  <!-- Pestañas (solo móvil) -->
+  <nav class="tabs-moviles" role="tablist">
+    <button id="tab-datos" class="tab tab--activa" role="tab" aria-selected="true" aria-controls="panel-datos" data-tab="datos">Datos</button>
+    <button id="tab-mapa" class="tab" role="tab" aria-selected="false" aria-controls="panel-mapa" data-tab="mapa">Mapa territorial</button>
+  </nav>
+
+  <main class="pagina">
+
+    <!-- Panel de datos: 40% en escritorio -->
+    <section id="panel-datos" class="panel-datos scroll-ios" role="tabpanel" aria-labelledby="tab-datos">
+
+      <!-- Filtros -->
+      <div class="filtros">
+        <label class="xm-field">Año
+          <select id="filtro-anio"></select>
+        </label>
+        <label class="xm-field">Alcaldía
+          <select id="filtro-alcaldia">
+            <option value="">Todas</option>
+          </select>
+        </label>
+        <label class="xm-field xm-field--ancho">Buscar sección o colonia
+          <input id="buscador" type="search" placeholder="Ej. 3217 o Tizapán" autocomplete="off">
+        </label>
+      </div>
+
+      <p id="estado" class="xm-etiqueta num">Cargando datos…</p>
+
+      <!-- Participación (dato protagonista) y métricas secundarias -->
+      <div id="kpis" class="bloque" style="border-top: 0; padding-top: 0">
+        <div>
+          <p class="xm-etiqueta">Participación</p>
+          <p id="kpi-participacion" class="xm-dato num">—</p>
+        </div>
+        <div class="metricas">
+          <div class="metrica">
+            <p class="xm-etiqueta">Lista nominal</p>
+            <p id="kpi-ln" class="xm-subtitulo num">—</p>
+          </div>
+          <div class="metrica">
+            <p class="xm-etiqueta">No votantes</p>
+            <p id="kpi-nv" class="xm-subtitulo num">—</p>
+          </div>
+          <div class="metrica">
+            <p class="xm-etiqueta">Votos PREP</p>
+            <p id="kpi-votos" class="xm-subtitulo num">—</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Lista de secciones electorales, en orden ascendente por número de sección -->
+      <div class="bloque" style="gap: var(--space-2)">
+        <h2 class="xm-subtitulo">Secciones electorales</h2>
+        <div id="tabla-wrap" class="tabla-wrap scroll-ios">
+          <table class="tabla num">
+            <thead>
+              <tr>
+                <th>Sección</th>
+                <th>Colonia</th>
+                <th class="der">Part.</th>
+                <th class="der">Votos</th>
+                <th>Más votado</th>
+              </tr>
+            </thead>
+            <tbody id="tabla-cuerpo"></tbody>
+          </table>
+        </div>
+        <div class="tabla-pie" style="padding-top: var(--space-2)">
+          <span id="tabla-conteo" class="xm-etiqueta num"></span>
+          <button id="tabla-mas" class="xm-btn hidden" type="button">Mostrar más</button>
+        </div>
+      </div>
+
+      <!-- Votos por partido o coalición -->
+      <div id="card-grafica" class="bloque">
+        <h2 class="xm-subtitulo">Votos por partido o coalición</h2>
+        <div class="grafica-fila">
+          <div id="grafica-contenedor" class="relative grafica-canvas" style="height: 320px">
+            <canvas id="grafica-partidos" aria-label="Gráfica de votos por partido"></canvas>
+          </div>
+          <div class="grafica-valores-col">
+            <div id="grafica-valores" class="grafica-valores"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Perfil de votantes -->
+      <div class="bloque">
+        <h2 class="xm-subtitulo">Perfil de votantes</h2>
+
+        <div style="display:flex; flex-direction: column; gap: var(--space-2)">
+          <p class="xm-etiqueta">Género</p>
+          <div class="badges">
+            <span class="badge"><i class="badge__punto" style="background: var(--acento)"></i>Mujeres: <strong id="gen-m-pct">—</strong> (<span id="gen-m-n">—</span>)</span>
+            <span class="badge"><i class="badge__punto" style="background: var(--gris-4)"></i>Hombres: <strong id="gen-h-pct">—</strong> (<span id="gen-h-n">—</span>)</span>
+          </div>
+          <div class="gen-barra" role="img" aria-label="Distribución por género de votantes">
+            <div id="gen-m" class="gen-barra__seg gen-barra__seg--m" tabindex="0"></div>
+            <div id="gen-h" class="gen-barra__seg gen-barra__seg--h" tabindex="0"></div>
+          </div>
+        </div>
+
+        <div style="display:flex; flex-direction: column; gap: var(--space-3)">
+          <p class="xm-etiqueta">Grupos de edad</p>
+          <div id="grupo-jov" tabindex="0">
+            <div class="fila-edad"><span>18 a 29 años</span><span id="edad-jov-txt" class="fila-edad__valor">—</span></div>
+            <div class="riel"><div id="edad-jov" class="riel__fill"></div></div>
+          </div>
+          <div id="grupo-adu" tabindex="0">
+            <div class="fila-edad"><span>30 a 64 años</span><span id="edad-adu-txt" class="fila-edad__valor">—</span></div>
+            <div class="riel"><div id="edad-adu" class="riel__fill"></div></div>
+          </div>
+          <div id="grupo-may" tabindex="0">
+            <div class="fila-edad"><span>65 años o más</span><span id="edad-may-txt" class="fila-edad__valor">—</span></div>
+            <div class="riel"><div id="edad-may" class="riel__fill"></div></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Panel de mapa: 60% en escritorio -->
+    <section id="panel-mapa" class="panel-mapa hidden" role="tabpanel" aria-labelledby="tab-mapa">
+      <div style="display:flex; align-items:center; justify-content:space-between; gap: var(--space-3)">
+        <h2 class="xm-etiqueta">Mapa territorial · <span id="mapa-anio" class="num"></span></h2>
+        <a id="mapa-enlace" class="enlace" href="#" target="_blank" rel="noopener">Abrir en Google My Maps</a>
+      </div>
+      <div id="mapa-contenedor" class="relative scroll-ios mapa-contenedor">
+        <iframe id="mapa-iframe" title="Mapa territorial del Distrito 6" class="mapa-frame hidden"
+          loading="lazy" allowfullscreen referrerpolicy="no-referrer-when-downgrade"></iframe>
+        <div id="mapa-aviso" class="xm-etiqueta mapa-aviso">
+          El mapa de este año aún no está configurado.
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    // URLs de los mapas de Google My Maps (reemplazar los placeholders antes de desplegar)
+    const MAPAS = {
+      2015: 'https://www.google.com/maps/d/u/0/embed?mid=1IvVFtjaTisJ6rNRHrPEgbCtxbeujzDA&ehbc=2E312F',
+      2018: 'https://www.google.com/maps/d/u/0/embed?mid=1qWM3u5aTuX49O3b9GI0BJUggxNqVDig&ehbc=2E312F',
+      2021: 'https://www.google.com/maps/d/u/0/embed?mid=1wI8qufOCRmLzSMH1fqtKVJaRPbrTDXc&ehbc=2E312F',
+      2024: 'https://www.google.com/maps/d/u/0/embed?mid=1AlFZwtlQRFNp_eKkOzGfS8TcLPDzIOI&ehbc=2E312F'
+    };
+    const ANIOS = [2015, 2018, 2021, 2024];
+    const LIMITE_TABLA = 20;
+
+    // Opciones que no son partidos: no cuentan como "más votado"
+    const NO_PARTIDO = new Set(['NULOS', 'NO_REGISTRADAS', 'NO_REGISTRADOS']);
+
+    // Colores base por partido (aproximación de los institucionales; ajustables aquí).
+    // Coaliciones: promedio de los colores de sus partidos. Candidatos independientes: gris.
+    const COLOR_BASE = {
+      PAN: '#0055A4', PRI: '#E11D2E', PRD: '#FFCC00', PVEM: '#2FA84F', PT: '#A4262C',
+      MORENA: '#9B2247', MC: '#F58025', MOVIMIENTO_CIUDADANO: '#F58025',
+      NUEVA_ALIANZA: '#A3C700', PANAL: '#A3C700', PARTIDO_HUMANISTA: '#6D28D9',
+      ENCUENTRO_SOCIAL: '#14B8A6', PES: '#14B8A6', RSP: '#E879F9', FXM: '#1E40AF'
+    };
+    const COLOR_NEUTRO = '#c9a09a';
+
+    // Nombres cortos para etiquetas
+    const NOMBRE_CORTO = {
+      MOVIMIENTO_CIUDADANO: 'MC', NUEVA_ALIANZA: 'PANAL', PARTIDO_HUMANISTA: 'PH',
+      ENCUENTRO_SOCIAL: 'PES', NO_REGISTRADAS: 'No registradas', NO_REGISTRADOS: 'No registrados',
+      NULOS: 'Nulos'
+    };
+
+    // Descompone "C_PAN_PRD" o "PAN-PRI" en sus partidos base
+    const partesPartido = (p) => String(p).replace(/^C_/, '').split(/[-_]/).filter(Boolean);
+
+    function colorPartido(p) {
+      if (NO_PARTIDO.has(p)) return COLOR_NEUTRO;
+      const partes = partesPartido(p);
+      if (partes.some((x) => x.startsWith('CI') || x.startsWith('CAND_IND'))) return COLOR_NEUTRO;
+      const hexes = partes.map((x) => COLOR_BASE[x]).filter(Boolean);
+      if (!hexes.length) return COLOR_NEUTRO;
+      if (hexes.length === 1) return hexes[0];
+      // promedio de canales RGB
+      const canales = hexes.map((h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16)));
+      const media = [0, 1, 2].map((c) => Math.round(canales.reduce((a, v) => a + v[c], 0) / canales.length));
+      return '#' + media.map((v) => v.toString(16).padStart(2, '0')).join('');
+    }
+
+    function nombrePartido(p) {
+      if (NOMBRE_CORTO[p]) return NOMBRE_CORTO[p];
+      return String(p).replace(/^C_/, '').split(/[-_]/).map((x) => {
+        if (x === 'CI' || x.startsWith('CAND')) return 'Indep.';
+        return NOMBRE_CORTO[x] || x;
+      }).join(' + ');
+    }
+
+    // Tokens de xm.css (Chart.js no lee variables CSS)
+    const GRIS_3 = '#9c6470';
+    const GRIS_4 = '#c9a09a';
+    const GRIS_2 = '#5e141c';
+    const GRIS_5 = '#f5e3d8';
+    const FUENTE_CHART = "'Montserrat', system-ui, sans-serif";
+
+    const TAB_ACTIVA = 'tab tab--activa';
+    const TAB_INACTIVA = 'tab';
+
+    Chart.defaults.font.family = "'Montserrat', system-ui, sans-serif";
+    Chart.defaults.color = GRIS_4;
+
+    let datos = null;
+    let grafica = null;
+    let anioMapaActual = null;
+    let filasTabla = [];
+    let limiteActual = LIMITE_TABLA;
+
+    const $ = (id) => document.getElementById(id);
+    const fmt = (n) => (n === null || n === undefined || Number.isNaN(n)) ? '—' : Number(n).toLocaleString('es-MX');
+    const pct = (n) => (n === null || n === undefined || Number.isNaN(n)) ? '—' : `${Number(n).toFixed(1)} %`;
+    const sinAcentos = (t) => String(t ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+    const esc = (t) => String(t ?? '').replace(/[&<>"']/g, (c) => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    }[c]));
+
+    // Reinicia la animación fade-in de un elemento
+    function animar(el) {
+      el.classList.remove('fade-in');
+      void el.offsetWidth;
+      el.classList.add('fade-in');
+    }
+
+    function seccionesFiltradas() {
+      const alcaldia = $('filtro-alcaldia').value;
+      const q = sinAcentos($('buscador').value.trim());
+      return datos.secciones.filter((s) =>
+        (!alcaldia || s.alcaldia === alcaldia) &&
+        (!q || String(s.seccion).includes(q) || sinAcentos(s.colonia).includes(q))
+      );
+    }
+
+    function poblarFiltros() {
+      const selAnio = $('filtro-anio');
+      ANIOS.forEach((a) => selAnio.add(new Option(a, a)));
+      selAnio.value = String(ANIOS[ANIOS.length - 1]);
+
+      const selAlc = $('filtro-alcaldia');
+      [...new Set(datos.secciones.map((s) => s.alcaldia))].sort().forEach((a) => {
+        selAlc.add(new Option(a.replace(/\b\w/g, (c) => c.toUpperCase()), a));
+      });
+    }
+
+    // animarTarjetas: true al cambiar año o alcaldía; false al escribir en el buscador
+    function renderDatos(animarTarjetas = false) {
+      const anio = $('filtro-anio').value;
+      const secciones = seccionesFiltradas();
+      const participacion = datos.participacion[anio] || {};
+      const resultados = datos.resultados_prep[anio] || {};
+
+      let ln = 0, votantes = 0, noVotantes = 0, votos = 0;
+      const porPartido = {};
+      const filas = [];
+
+      for (const s of secciones) {
+        const p = participacion[s.seccion];
+        const res = resultados[s.seccion] || [];
+        if (p) {
+          ln += p.lista_nominal;
+          votantes += p.votantes;
+          noVotantes += p.no_votantes;
+          filas.push({ ...s, ...p, ganador: masVotado(res) });
+        }
+        for (const r of res) {
+          votos += r.votos;
+          porPartido[r.partido] = (porPartido[r.partido] || 0) + r.votos;
+        }
+      }
+
+      $('kpi-participacion').textContent = ln ? pct((votantes / ln) * 100) : '—';
+      $('kpi-ln').textContent = fmt(ln);
+      $('kpi-nv').textContent = fmt(noVotantes);
+      $('kpi-votos').textContent = fmt(votos);
+      $('estado').textContent = `${secciones.length} secciones seleccionadas · ${filas.length} con datos de participación en ${anio}`;
+
+      if (animarTarjetas) {
+        [$('kpis'), $('card-grafica')].forEach(animar);
+      }
+
+      renderGrafica(porPartido);
+      renderPerfil(filas);
+      limiteActual = LIMITE_TABLA;
+      renderTabla(filas);
+    }
+
+    function renderPerfil(filas) {
+      const suma = (fn) => filas.reduce((acc, f) => acc + (fn(f) || 0), 0);
+
+      // Género (votantes): solo hombres y mujeres; no binarios no aparecen en el desglose
+      const hombres = suma((f) => f.genero.hombres);
+      const mujeres = suma((f) => f.genero.mujeres);
+      const totalGenero = hombres + mujeres;
+      const pctH = totalGenero ? (hombres / totalGenero) * 100 : 0;
+      const pctM = totalGenero ? (mujeres / totalGenero) * 100 : 0;
+      $('gen-h').style.width = `${pctH}%`;
+      $('gen-m').style.width = `${pctM}%`;
+      $('gen-m-pct').textContent = totalGenero ? `${pctM.toFixed(1)}%` : '—';
+      $('gen-h-pct').textContent = totalGenero ? `${pctH.toFixed(1)}%` : '—';
+      $('gen-m-n').textContent = fmt(mujeres);
+      $('gen-h-n').textContent = fmt(hombres);
+      $('gen-m').dataset.tip = `Mujeres: ${fmt(mujeres)} votantes (${pctM.toFixed(1)}%)`;
+      $('gen-h').dataset.tip = `Hombres: ${fmt(hombres)} votantes (${pctH.toFixed(1)}%)`;
+
+      // Grupos de edad (votantes)
+      const jov = suma((f) => f.grupos_edad.jovenes_18_29);
+      const adu = suma((f) => f.grupos_edad.adultos_30_64);
+      const may = suma((f) => f.grupos_edad.mayores_65);
+      const totalEdad = jov + adu + may;
+      const grupos = [
+        ['edad-jov', jov, '18 a 29 años'],
+        ['edad-adu', adu, '30 a 64 años'],
+        ['edad-may', may, '65 años o más'],
+      ];
+      for (const [id, valor, etiqueta] of grupos) {
+        const share = totalEdad ? (valor / totalEdad) * 100 : 0;
+        $(id).style.width = `${share}%`;
+        $(`${id}-txt`).textContent = totalEdad ? `${fmt(valor)} · ${share.toFixed(1)}%` : '—';
+        $(id.replace('edad-', 'grupo-')).dataset.tip =
+          `${etiqueta}: ${fmt(valor)} votantes (${share.toFixed(1)}%)`;
+      }
+    }
+
+    // Partido con más votos en una sección (excluye nulos y no registradas)
+    function masVotado(resultadosSeccion) {
+      let mejor = null;
+      for (const r of resultadosSeccion || []) {
+        if (NO_PARTIDO.has(r.partido) || r.votos <= 0) continue;
+        if (!mejor || r.votos > mejor.votos) mejor = r;
+      }
+      return mejor;
+    }
+
+    // Lista de secciones: orden ascendente por número de sección y muestra de a LIMITE_TABLA filas
+    function renderTabla(filas) {
+      filasTabla = [...filas].sort((a, b) => a.seccion - b.seccion);
+      pintarTabla();
+    }
+
+    function pintarTabla() {
+      const visibles = filasTabla.slice(0, limiteActual);
+      $('tabla-cuerpo').innerHTML = visibles.map((f) => {
+        const g = f.ganador;
+        const celdaGanador = g
+          ? `<span class="swatch" style="background:${colorPartido(g.partido)}"></span>${esc(nombrePartido(g.partido))} <span class="gris">${fmt(g.votos)}</span>`
+          : '<span class="gris">—</span>';
+        return `
+        <tr>
+          <td>${esc(f.seccion)}</td>
+          <td>${esc(f.colonia)}</td>
+          <td class="der">${pct(f.pct_part)}</td>
+          <td class="der">${fmt(f.votantes)}</td>
+          <td>${celdaGanador}</td>
+        </tr>`;
+      }).join('') || `<tr><td colspan="5" class="gris" style="text-align:center">Sin resultados</td></tr>`;
+
+      const total = filasTabla.length;
+      $('tabla-conteo').textContent = total
+        ? `Mostrando ${fmt(visibles.length)} de ${fmt(total)} secciones`
+        : 'Sin secciones';
+      const restantes = total - visibles.length;
+      $('tabla-mas').classList.toggle('hidden', restantes <= 0);
+      $('tabla-mas').textContent = restantes > 0 ? `Mostrar ${fmt(Math.min(restantes, LIMITE_TABLA))} más` : '';
+    }
+
+    // Escribe el número de votos de cada barra en la columna de la derecha, alineado a su centro
+    const valoresEnColumna = {
+      id: 'valoresEnColumna',
+      afterUpdate(chart) {
+        const contenedor = $('grafica-valores');
+        if (!contenedor) return;
+        const barras = chart.getDatasetMeta(0).data;
+        const valores = chart.data.datasets[0].data;
+        contenedor.innerHTML = barras.map((barra, i) =>
+          `<span style="top:${barra.y - 10}px">${Number(valores[i]).toLocaleString('es-MX')}</span>`
+        ).join('');
+      }
+    };
+
+    // Barras horizontales: los nombres de coalición son largos y necesitan espacio
+    function renderGrafica(porPartido) {
+      const top = Object.entries(porPartido)
+        .filter(([p]) => !NO_PARTIDO.has(p))
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 12);
+      $('grafica-contenedor').style.height = `${Math.max(160, top.length * 28 + 32)}px`;
+
+      const datosGrafica = {
+        labels: top.map(([p]) => nombrePartido(p)),
+        datasets: [{
+          label: 'Votos',
+          data: top.map(([, v]) => v),
+          backgroundColor: top.map(([p]) => colorPartido(p)),
+          hoverBackgroundColor: top.map(([p]) => colorPartido(p)),
+          borderRadius: 2,
+          borderSkipped: false,
+          barThickness: 16
+        }]
+      };
+      const opciones = {
+        indexAxis: 'y',
+        responsive: true,
+        maintainAspectRatio: false,
+        devicePixelRatio: window.devicePixelRatio || 2,
+        animation: { duration: 400, easing: 'easeOutQuart' },
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            backgroundColor: GRIS_2,
+            borderColor: GRIS_3,
+            borderWidth: 1,
+            cornerRadius: 8,
+            padding: 12,
+            boxPadding: 4,
+            displayColors: true,
+            titleColor: GRIS_5,
+            bodyColor: GRIS_5,
+            titleFont: { family: FUENTE_CHART, size: 14, weight: '600' },
+            bodyFont: { family: FUENTE_CHART, size: 14, weight: '400' },
+            callbacks: {
+              label: (ctx) => `${Number(ctx.parsed.x).toLocaleString('es-MX')} votos`
+            }
+          }
+        },
+        scales: {
+          x: { ticks: { color: GRIS_4, font: { size: 14 }, maxRotation: 0, autoSkipPadding: 16, maxTicksLimit: 5, callback: (v) => Number(v).toLocaleString('es-MX') },
+               grid: { color: 'rgba(156, 100, 112, 0.35)' }, border: { display: false } },
+          y: { ticks: { color: GRIS_4, font: { size: 14 } }, grid: { display: false }, border: { color: GRIS_3 } }
+        }
+      };
+      if (grafica) {
+        grafica.data = datosGrafica;
+        grafica.update();
+      } else {
+        grafica = new Chart($('grafica-partidos'), {
+          type: 'bar', data: datosGrafica, options: opciones, plugins: [valoresEnColumna]
+        });
+      }
+    }
+
+    function actualizarMapa(anio) {
+      if (anio === anioMapaActual) return;
+      anioMapaActual = anio;
+      const url = MAPAS[anio];
+      const iframe = $('mapa-iframe');
+      const aviso = $('mapa-aviso');
+      $('mapa-anio').textContent = anio;
+      if (!url || url.startsWith('MAPA_')) {
+        iframe.classList.add('hidden');
+        iframe.removeAttribute('src');
+        aviso.classList.remove('hidden');
+        $('mapa-enlace').removeAttribute('href');
+      } else {
+        aviso.classList.add('hidden');
+        iframe.src = url;
+        iframe.classList.remove('hidden');
+        $('mapa-enlace').href = url;
+      }
+      animar($('mapa-contenedor'));
+    }
+
+    function mostrarPestana(nombre) {
+      const esDatos = nombre === 'datos';
+      $('panel-datos').classList.toggle('hidden', !esDatos);
+      $('panel-mapa').classList.toggle('hidden', esDatos);
+      $('tab-datos').setAttribute('aria-selected', esDatos);
+      $('tab-mapa').setAttribute('aria-selected', !esDatos);
+      $('tab-datos').className = esDatos ? TAB_ACTIVA : TAB_INACTIVA;
+      $('tab-mapa').className = !esDatos ? TAB_ACTIVA : TAB_INACTIVA;
+    }
+
+    function iniciar() {
+      poblarFiltros();
+      renderDatos(true);
+      actualizarMapa(Number($('filtro-anio').value));
+
+      $('filtro-anio').addEventListener('change', () => {
+        renderDatos(true);
+        actualizarMapa(Number($('filtro-anio').value));
+      });
+      $('filtro-alcaldia').addEventListener('change', () => renderDatos(true));
+      $('buscador').addEventListener('input', () => renderDatos(false));
+      $('tabla-mas').addEventListener('click', () => {
+        limiteActual += LIMITE_TABLA;
+        pintarTabla();
+      });
+      document.querySelectorAll('[data-tab]').forEach((b) =>
+        b.addEventListener('click', () => mostrarPestana(b.dataset.tab)));
+    }
+
+    fetch('datos_electorales.json')
+      .then((r) => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return r.json();
+      })
+      .then((json) => {
+        datos = json;
+        $('estado').textContent = '';
+        iniciar();
+      })
+      .catch((err) => {
+        $('estado').textContent = `No se pudieron cargar los datos (${err.message}). Revisa que datos_electorales.json esté en la misma carpeta.`;
+        $('estado').style.color = 'var(--acento)';
+      });
+  </script>
+</body>
+</html>
