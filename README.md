@@ -8,3 +8,4 @@ Consolida resultados del PREP y participacion ciudadana (2015, 2018, 2021 y 2024
 3. python generar_json_web.py
 
 Las rutas de los archivos fuente apuntan a la carpeta de descargas del usuario. Ver DOCUMENTO_EJECUTIVO.md para reglas de negocio, limitaciones y pendientes.
+https://richm-m.github.io/analisis-electoral-d6/
