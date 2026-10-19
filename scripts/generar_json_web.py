@@ -1,4 +1,5 @@
-"""Genera datos_electorales.json a partir de los CSV consolidados de PREP y participacion.
+"""Genera docs/datos_electorales.json, el archivo que consume el tablero web, a partir de
+los CSV de data/processed/.
 
 Estructura:
   secciones:     lista de secciones unicas con alcaldia y colonia
@@ -15,11 +16,12 @@ from pathlib import Path
 
 import pandas as pd
 
-BASE_DIR = Path(__file__).resolve().parent
-PREP_CSV = BASE_DIR / "PREP_PURO_CONSOLIDADO_DISTRITO6.csv"
-PARTICIPACION_CSV = BASE_DIR / "PARTICIPACION_HISTORICA_DISTRITO6.csv"
-PARTICIPACION_PREP_CSV = BASE_DIR / "PARTICIPACION_PREP_OFICIAL.csv"
-SALIDA = BASE_DIR / "datos_electorales.json"
+RAIZ = Path(__file__).resolve().parents[1]
+PROCESADOS = RAIZ / "data" / "processed"
+PREP_CSV = PROCESADOS / "PREP_PURO_CONSOLIDADO_DISTRITO6.csv"
+PARTICIPACION_CSV = PROCESADOS / "PARTICIPACION_HISTORICA_DISTRITO6.csv"
+PARTICIPACION_PREP_CSV = PROCESADOS / "PARTICIPACION_PREP_OFICIAL.csv"
+SALIDA = RAIZ / "docs" / "datos_electorales.json"
 
 COLUMNAS_DESGLOSE = [
     "Votantes_Hombres", "Votantes_Mujeres",
@@ -61,7 +63,7 @@ def main():
                        "Vuelve a ejecutar procesar_participacion_historica.py")
 
     # Lista nominal, votantes y participacion vienen del PREP (actas contabilizadas);
-    # el genero y los grupos de edad vienen de los archivos del INE.
+    # el genero y los grupos de edad vienen de las estadisticas de participacion por seccion.
     part_prep = pd.read_csv(PARTICIPACION_PREP_CSV, encoding="utf-8-sig")
     part = part.merge(part_prep, on=["ANIO", "SECCION"], how="left")
 

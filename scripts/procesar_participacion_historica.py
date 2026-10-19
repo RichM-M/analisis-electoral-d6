@@ -1,8 +1,9 @@
-"""Participacion historica por seccion electoral (2015, 2018, 2021 y 2024) para
-LA MAGDALENA CONTRERAS y ALVARO OBREGON.
+"""Participacion ciudadana por seccion electoral (2015, 2018, 2021 y 2024) para el
+distrito federal 6 de la Ciudad de Mexico, desglosada por sexo y grupo de edad.
 
-Usa los archivos de votantes, no votantes y lista nominal por seccion, desglosados
-por edad y sexo. Solo se conservan las secciones del catalogo objetivo.
+Entradas:  data/raw/participacion/ (votantes, no votantes y lista nominal por seccion)
+           data/raw/catalogos/
+Salida:    data/processed/PARTICIPACION_HISTORICA_DISTRITO6.csv
 """
 
 import io
@@ -12,13 +13,15 @@ from pathlib import Path
 
 import pandas as pd
 
-BASE_DIR = Path(__file__).resolve().parent
-DESCARGAS = Path.home() / "Downloads"
+RAIZ = Path(__file__).resolve().parents[1]
+CATALOGOS = RAIZ / "data" / "raw" / "catalogos"
+PART_DIR = RAIZ / "data" / "raw" / "participacion"
+PROCESADOS = RAIZ / "data" / "processed"
 
-CATALOGO_PATH = DESCARGAS / "listado_colonias_secciones_alcaldia.csv"
-CATALOGO_INE_PATH = BASE_DIR / "catalogo_ine" / "20240503_CORTE_CASILLAS_PEF24.xlsx"
-COLONIAS_EXTRA_PATH = BASE_DIR / "colonias_secciones_faltantes.csv"  # secciones sin colonia en el listado
-SALIDA = BASE_DIR / "PARTICIPACION_HISTORICA_DISTRITO6.csv"
+CATALOGO_PATH = CATALOGOS / "listado_colonias_secciones_alcaldia.csv"
+CATALOGO_INE_PATH = CATALOGOS / "20240503_CORTE_CASILLAS_PEF24.xlsx"
+COLONIAS_EXTRA_PATH = CATALOGOS / "colonias_secciones_faltantes.csv"  # secciones sin colonia en el listado
+SALIDA = PROCESADOS / "PARTICIPACION_HISTORICA_DISTRITO6.csv"
 
 ALCALDIAS_OBJETIVO = ["LA MAGDALENA CONTRERAS", "ALVARO OBREGON"]
 ID_CDMX = 9
@@ -30,24 +33,24 @@ MAYORES = "65MAS"
 
 ARCHIVOS = {
     2015: {
-        "votantes": DESCARGAS / "votantes_participacion2015_sec.csv",
-        "no_votantes": DESCARGAS / "no_votantes_participacion2015_sec.csv",
-        "lista_nominal": DESCARGAS / "ln_20150415_ajustada_sec.csv",
+        "votantes": PART_DIR / "votantes_participacion2015_sec.csv",
+        "no_votantes": PART_DIR / "no_votantes_participacion2015_sec.csv",
+        "lista_nominal": PART_DIR / "ln_20150415_ajustada_sec.csv",
     },
     2018: {
-        "votantes": DESCARGAS / "part2018peVotoSec.xlsx",
-        "no_votantes": DESCARGAS / "part2018peNoVotoSec.xlsx",
-        "lista_nominal": DESCARGAS / "part2018peListaNominalSec.xlsx",
+        "votantes": PART_DIR / "part2018peVotoSec.xlsx",
+        "no_votantes": PART_DIR / "part2018peNoVotoSec.xlsx",
+        "lista_nominal": PART_DIR / "part2018peListaNominalSec.xlsx",
     },
     2021: {
-        "votantes": DESCARGAS / "part2021peVotoSec.xlsx",
-        "no_votantes": DESCARGAS / "part2021peNoVotoSec.xlsx",
-        "lista_nominal": DESCARGAS / "part2021peListaNominalSec.xlsx",
+        "votantes": PART_DIR / "part2021peVotoSec.xlsx",
+        "no_votantes": PART_DIR / "part2021peNoVotoSec.xlsx",
+        "lista_nominal": PART_DIR / "part2021peListaNominalSec.xlsx",
     },
     2024: {
-        "votantes": DESCARGAS / "VotantesSEC.xlsx",
-        "no_votantes": DESCARGAS / "NoVotantesSEC.xlsx",
-        "lista_nominal": DESCARGAS / "LnSEC.xlsx",
+        "votantes": PART_DIR / "VotantesSEC.xlsx",
+        "no_votantes": PART_DIR / "NoVotantesSEC.xlsx",
+        "lista_nominal": PART_DIR / "LnSEC.xlsx",
     },
 }
 
@@ -252,6 +255,13 @@ def procesar_anio(anio, mapa_alcaldia, colonias):
 
 
 def main():
+    entradas = [CATALOGO_PATH, CATALOGO_INE_PATH, COLONIAS_EXTRA_PATH,
+                *(ruta for archivos in ARCHIVOS.values() for ruta in archivos.values())]
+    faltan = [str(p.relative_to(RAIZ)) for p in entradas if not p.exists()]
+    if faltan:
+        raise SystemExit("Faltan archivos de entrada (ver data/raw/README.md):\n  " + "\n  ".join(faltan))
+
+    PROCESADOS.mkdir(parents=True, exist_ok=True)
     catalogo = cargar_catalogo()
     mapa_alcaldia = catalogo[["SECCION", "ALCALDIA"]].drop_duplicates()
     colonias = (

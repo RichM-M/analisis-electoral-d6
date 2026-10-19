@@ -1,5 +1,9 @@
-"""Consolida los resultados del PREP (diputaciones federales 2015, 2018, 2021 y 2024)
-a nivel SECCION ELECTORAL para LA MAGDALENA CONTRERAS y ALVARO OBREGON.
+"""Consolida los resultados del PREP de diputaciones federales (2015, 2018, 2021 y 2024)
+por seccion electoral para el distrito federal 6 de la Ciudad de Mexico.
+
+Entradas:  data/raw/prep/DIP_FED_<anio>.csv y data/raw/catalogos/
+Salidas:   data/processed/PREP_PURO_CONSOLIDADO_DISTRITO6.csv
+           data/processed/PARTICIPACION_PREP_OFICIAL.csv
 
 Los votos de partidos, coaliciones, candidaturas independientes, nulos y no registrados
 se conservan tal cual vienen en cada PREP (sin agrupar en bloques politicos).
@@ -12,20 +16,17 @@ from pathlib import Path
 
 import pandas as pd
 
-BASE_DIR = Path(__file__).resolve().parent
-DESCARGAS = Path.home() / "Downloads"
+RAIZ = Path(__file__).resolve().parents[1]
+CATALOGOS = RAIZ / "data" / "raw" / "catalogos"
+PREP_DIR = RAIZ / "data" / "raw" / "prep"
+PROCESADOS = RAIZ / "data" / "processed"
 
-CATALOGO_PATH = DESCARGAS / "listado_colonias_secciones_alcaldia.csv"
-CATALOGO_INE_PATH = BASE_DIR / "catalogo_ine" / "20240503_CORTE_CASILLAS_PEF24.xlsx"
-COLONIAS_EXTRA_PATH = BASE_DIR / "colonias_secciones_faltantes.csv"  # secciones sin colonia en el listado
-PREP_PATHS = {
-    2015: DESCARGAS / "DIP_FED_2015.csv",
-    2018: DESCARGAS / "DIP_FED_2018.csv",
-    2021: DESCARGAS / "DIP_FED_2021.csv",
-    2024: BASE_DIR / "prep_2024_nuevo" / "DIP_FED_2024.csv",  # descarga oficial del 20240603_2005
-}
-SALIDA = BASE_DIR / "PREP_PURO_CONSOLIDADO_DISTRITO6.csv"
-PARTICIPACION_SALIDA = BASE_DIR / "PARTICIPACION_PREP_OFICIAL.csv"
+CATALOGO_PATH = CATALOGOS / "listado_colonias_secciones_alcaldia.csv"
+CATALOGO_INE_PATH = CATALOGOS / "20240503_CORTE_CASILLAS_PEF24.xlsx"
+COLONIAS_EXTRA_PATH = CATALOGOS / "colonias_secciones_faltantes.csv"  # secciones sin colonia en el listado
+PREP_PATHS = {anio: PREP_DIR / f"DIP_FED_{anio}.csv" for anio in (2015, 2018, 2021, 2024)}
+SALIDA = PROCESADOS / "PREP_PURO_CONSOLIDADO_DISTRITO6.csv"
+PARTICIPACION_SALIDA = PROCESADOS / "PARTICIPACION_PREP_OFICIAL.csv"
 
 # Columna de total de votos calculados en cada PREP (incluye nulos y no registradas)
 TOTAL_COL = {
@@ -227,6 +228,12 @@ def procesar_anio(anio, ruta, mapa_alcaldia):
 
 
 def main():
+    faltan = [str(p.relative_to(RAIZ)) for p in [CATALOGO_PATH, CATALOGO_INE_PATH, COLONIAS_EXTRA_PATH,
+                                                *PREP_PATHS.values()] if not p.exists()]
+    if faltan:
+        raise SystemExit("Faltan archivos de entrada (ver data/raw/README.md):\n  " + "\n  ".join(faltan))
+
+    PROCESADOS.mkdir(parents=True, exist_ok=True)
     catalogo = cargar_catalogo()
     mapa_alcaldia = catalogo[["SECCION", "ALCALDIA"]].drop_duplicates()
     secciones_objetivo = set(mapa_alcaldia["SECCION"])

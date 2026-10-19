@@ -1,11 +1,19 @@
+# Python
 __pycache__/
-pylib*/
-prep_2024_nuevo/
-bgd_cdmx/
-dashboard_test/
-.claude/
+*.pyc
+
+# Bases de datos fuente: se descargan (ver data/raw/README.md)
+data/raw/prep/*
+data/raw/participacion/*
+!data/raw/prep/.gitkeep
+!data/raw/participacion/.gitkeep
+
+# Archivos comprimidos y cartografía de trabajo
 *.zip
 *.7z
+*.tar.gz
 *.kmz
 *.kml
-*.tar.gz
+
+# Configuración local
+.claude/
